@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Images } from './images.entity';
 import { Repository } from 'typeorm';
@@ -46,9 +46,9 @@ export class ImagesService {
   }
 
   async uploadImage(file: Express.Multer.File) {
-    const filePath = await this.resizeAndConvertImage(file);
-    const newImage = this.imagesRepository.create({ url: filePath });
-    return this.imagesRepository.save(newImage);
+    const { outputPath, delta } = await this.resizeAndConvertImage(file);
+    const newImage = this.imagesRepository.create({ url: outputPath });
+    return { filePath: this.imagesRepository.save(newImage), delta };
   }
 
   private async downloadImagefromURL(url: string) {
@@ -76,11 +76,14 @@ export class ImagesService {
     maxWidth: number = 576,
     maxHeight: number = 1024,
     quality: number = 70,
-  ): Promise<string> {
+  ) {
     const inputPath = file.path;
     const baseName = file.filename.split('.')[0];
     const outputFileName = `${baseName}.webp`;
     const outputPath = join('uploads', outputFileName);
+
+    Logger.debug("Debut de la conversion de l'image");
+    const timestamp = Date.now();
 
     await sharp(inputPath)
       .resize({
@@ -94,6 +97,12 @@ export class ImagesService {
 
     await fs.unlink(inputPath);
 
-    return outputPath;
+    const delta = Date.now() - timestamp;
+
+    Logger.debug(
+      "Fin de la conversion de l'image : " + (delta) + 'ms',
+    );
+
+    return {outputPath, delta};
   }
 }
