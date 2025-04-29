@@ -40,7 +40,7 @@ export class ImagesService {
       stream: undefined!,
     };
 
-    const newFilePath = await this.resizeAndConvertImage(file);
+    const newFilePath = await this.resizeAndConvertImage(file).outputPath;
     const newImage = this.imagesRepository.create({ url: newFilePath });
     return this.imagesRepository.save(newImage);
   }
