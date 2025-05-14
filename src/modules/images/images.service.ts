@@ -1,18 +1,21 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Images } from './images.entity';
 import { Repository } from 'typeorm';
-import { CreateImageDto } from './dto/image.create.dto';
+import { CreateImageDto } from './dto/images.create.dto';
 import axios from 'axios';
-import { join, extname } from 'path';
-import { createWriteStream, promises as fs } from 'fs';
-const sharp = require('sharp');
+import { extname } from 'path';
+import { createWriteStream } from 'fs';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 
 @Injectable()
 export class ImagesService {
   constructor(
     @InjectRepository(Images)
     private imagesRepository: Repository<Images>,
+    @InjectQueue('images-compression')
+    public imagesCompressionQueue: Queue,
   ) {}
 
   async getAllImages() {
@@ -40,15 +43,23 @@ export class ImagesService {
       stream: undefined!,
     };
 
-    const {outputPath, delta} = await this.resizeAndConvertImage(file);
-    const newImage = this.imagesRepository.create({ url: outputPath });
-    return this.imagesRepository.save(newImage);
+    const newImage = this.imagesRepository.create({ url: filePath });
+    const newImageData = await this.imagesRepository.save(newImage);
+    const job = await this.imagesCompressionQueue.add('resize-image', {
+      file: file,
+      id: newImageData.id,
+    });
+    return newImageData;
   }
 
   async uploadImage(file: Express.Multer.File) {
-    const { outputPath, delta } = await this.resizeAndConvertImage(file);
-    const newImage = this.imagesRepository.create({ url: outputPath });
-    return { filePath: this.imagesRepository.save(newImage), delta };
+    const newImage = this.imagesRepository.create({ url: file.path });
+    const newImageData = await this.imagesRepository.save(newImage);
+    const job = await this.imagesCompressionQueue.add('resize-image', {
+      file: file,
+      id: newImageData.id,
+    });
+    return newImageData;
   }
 
   private async downloadImagefromURL(url: string) {
@@ -71,38 +82,40 @@ export class ImagesService {
     return path;
   }
 
-  private async resizeAndConvertImage(
-    file: Express.Multer.File,
-    maxWidth: number = 576,
-    maxHeight: number = 1024,
-    quality: number = 70,
-  ) {
-    const inputPath = file.path;
-    const baseName = file.filename.split('.')[0];
-    const outputFileName = `${baseName}.webp`;
-    const outputPath = join('uploads', outputFileName);
-
-    Logger.debug("Debut de la conversion de l'image");
-    const timestamp = Date.now();
-
-    await sharp(inputPath)
-      .resize({
-        width: maxWidth,
-        height: maxHeight,
-        fit: 'inside',
-        withoutEnlargement: true,
-      })
-      .webp({ quality })
-      .toFile(outputPath);
-
-    await fs.unlink(inputPath);
-
-    const delta = Date.now() - timestamp;
-
-    Logger.debug(
-      "Fin de la conversion de l'image : " + (delta) + 'ms',
-    );
-
-    return {outputPath, delta};
+  async updateImagePath(id: number, url: string) {
+    return this.imagesRepository.update(id, { url });
   }
+
+  // private async resizeAndConvertImage(
+  //   file: Express.Multer.File,
+  //   maxWidth: number = 576,
+  //   maxHeight: number = 1024,
+  //   quality: number = 70,
+  // ) {
+  //   const inputPath = file.path;
+  //   const baseName = file.filename.split('.')[0];
+  //   const outputFileName = `${baseName}.webp`;
+  //   const outputPath = join('uploads', outputFileName);
+  //
+  //   Logger.debug("Debut de la conversion de l'image");
+  //   const timestamp = Date.now();
+  //
+  //   await sharp(inputPath)
+  //     .resize({
+  //       width: maxWidth,
+  //       height: maxHeight,
+  //       fit: 'inside',
+  //       withoutEnlargement: true,
+  //     })
+  //     .webp({ quality })
+  //     .toFile(outputPath);
+  //
+  //   await fs.unlink(inputPath);
+  //
+  //   const delta = Date.now() - timestamp;
+  //
+  //   Logger.debug("Fin de la conversion de l'image : " + delta + 'ms');
+  //
+  //   return { outputPath, delta };
+  // }
 }

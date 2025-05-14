@@ -9,7 +9,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { ImagesService } from './images.service';
-import { CreateImageDto } from './dto/image.create.dto';
+import { CreateImageDto } from './dto/images.create.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { multerConfig } from '../../config/multer.config';
 import { mimeTypeRegex } from '../../constant/regex';
