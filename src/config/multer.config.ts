@@ -4,7 +4,7 @@ import { mimeTypeRegex } from '../constant/regex';
 
 export const multerConfig = {
   storage: diskStorage({
-    destination: './uploads', // Dossier où les fichiers seront stockés
+    destination: './waiting', // Dossier où les fichiers seront stockés
     filename: (req, file, callback) => {
       const uniqueSuffix = Date.now();
       const ext = extname(file.originalname);
