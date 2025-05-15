@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Images } from './modules/images/images.entity';
 import { ImagesModule } from './modules/images/images.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ImagesModule } from './modules/images/images.module';
       entities: [Images],
       synchronize: true,
     }),
+    ScheduleModule.forRoot(),
     ImagesModule,
   ],
   controllers: [AppController],
